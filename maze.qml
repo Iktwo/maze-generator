@@ -1,13 +1,22 @@
 import QtQuick 2.0
 
-Item {
+Rectangle {
     id: root
+
+    property int lineSize: 2
 
     property var inMaze: []
     property var inFrontier: []
 
-    property int rows: 15
-    property int columns: 15
+    property int rows: 10
+    property int columns: 10
+
+    property bool generated: false
+
+    property int cellHeight: Math.round((height - (viewMargins * 2))/ rows)
+    property int cellWidth: Math.round((width - (viewMargins * 2))/ columns)
+
+    property int viewMargins: 20
 
     signal openPathOnIndex(int indexToOpen, string direction)
 
@@ -91,127 +100,207 @@ Item {
         }
     }
 
-    width: 640
-    height: 640
+    function resetMaze() {
+        inMaze = []
+        inFrontier = []
+        generated = false
+        root.forceActiveFocus()
+        view.model = undefined
+        view.model = columns * rows
+    }
 
-    GridView {
-        id: view
+    width: 1000
+    height: 1000
 
-        anchors {
-            fill: parent
-            margins: 20
-        }
+    color: "#ffffff"
 
-        model: root.columns * root.rows
-        cellHeight: height / rows
-        cellWidth: width / columns
-        interactive: false
+    FocusScope {
+        anchors.centerIn: parent
 
-        Keys.onLeftPressed: moveCurrentIndexLeft()
-        Keys.onRightPressed: moveCurrentIndexRight()
-        Keys.onUpPressed: moveCurrentIndexUp()
-        Keys.onDownPressed: moveCurrentIndexDown()
-
-        Keys.onReturnPressed:  {
-            currentItem.active = !currentItem.active
-        }
-
-        Keys.onEnterPressed: {
-            currentItem.active = !currentItem.active
-        }
-
-        Keys.onPressed: {
-            if (event.key === Qt.Key_W) {
-                currentItem.upwall = !currentItem.upwall
-                event.accepted = true;
-            } else if (event.key === Qt.Key_S) {
-                currentItem.downwall = !currentItem.downwall
-                event.accepted = true;
-            } else if (event.key === Qt.Key_A) {
-                currentItem.leftwall = !currentItem.leftwall
-                event.accepted = true;
-            } else if (event.key === Qt.Key_D) {
-                currentItem.rightwall = !currentItem.rightwall
-                event.accepted = true;
-            }
-        }
+        height: childrenRect.height
+        width: childrenRect.width
 
         focus: true
 
-        delegate: Rectangle {
-            id: delegate
+        Repeater {
+            id: view
 
-            property bool active: false
-            property bool upwall: true
-            property bool downwall: true
-            property bool leftwall: true
-            property bool rightwall: true
+            model: root.columns * root.rows
 
-            height: GridView.view.cellHeight
-            width: GridView.view.cellWidth
+            Keys.onReturnPressed:  {
+                currentItem.active = !currentItem.active
+            }
 
-            color: inFrontier.indexOf(index) != -1 ? "#2ecc71" : (inMaze.indexOf(index) != -1 ? "#ecf0f1" : (active ? "#ecf0f1" : "#bdc3c7"))
+            Keys.onEnterPressed: {
+                currentItem.active = !currentItem.active
+            }
 
-            /// TODO: find a way to not do this, this makes the whole thing ultra slow
-            Connections {
-                target: root
-                onOpenPathOnIndex: {
-                    if (index == indexToOpen) {
-
-                        if (direction == "up")
-                            delegate.upwall = false
-                        else if (direction == "down")
-                            delegate.downwall = false
-                        else if (direction == "left")
-                            delegate.leftwall = false
-                        else if (direction == "right")
-                            delegate.rightwall = false
-                    }
+            Keys.onPressed: {
+                if (event.key === Qt.Key_W) {
+                    currentItem.upwall = !currentItem.upwall
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_S) {
+                    currentItem.downwall = !currentItem.downwall
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_A) {
+                    currentItem.leftwall = !currentItem.leftwall
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_D) {
+                    currentItem.rightwall = !currentItem.rightwall
+                    event.accepted = true;
                 }
             }
 
-            Rectangle {
-                anchors.top: parent.top
-                height: 1
-                width: parent.width
-                color: "black"
+            focus: true
 
-                visible: upwall
-            }
+            delegate: Rectangle {
+                id: delegate
 
-            Rectangle {
-                anchors.bottom: parent.bottom
-                height: 1
-                width: parent.width
-                color: "black"
+                property bool active: false
+                property bool upwall: true
+                property bool downwall: true
+                property bool leftwall: true
+                property bool rightwall: true
+                property int calculatedRow: index / columns
+                property int calculatedColumn: index % columns
 
-                visible: downwall
-            }
+                function handleKey(key) {
+                    switch(key) {
+                    case Qt.Key_Up:
+                        if (calculatedRow === 0) {
+                            upwall = !upwall
+                        }
 
-            Rectangle {
-                anchors.left: parent.left
-                height: parent.height
-                width: 1
-                color: "black"
+                        console.log("move up", calculatedRow, calculatedColumn);
+                        break;
+                    case Qt.Key_Down:
+                        if (calculatedRow === rows - 1) {
+                            downwall = !downwall
+                        }
+                        console.log("move down", calculatedRow, calculatedColumn);
+                        break;
+                    case Qt.Key_Left:
+                        if (calculatedColumn === 0) {
+                            leftwall = !leftwall
+                        }
 
-                visible: leftwall
-            }
+                        console.log("move left", calculatedRow, calculatedColumn);
+                        break;
+                    case Qt.Key_Right:
+                        if (calculatedColumn === columns - 1) {
+                            rightwall = !rightwall
+                        }
 
-            Rectangle {
-                anchors.right: parent.right
-                height: parent.height
-                width: 1
-                color: "black"
+                        console.log("move right", calculatedRow, calculatedColumn);
+                        break;
 
-                visible: rightwall
-            }
+                    }
+                }
 
-            MouseArea {
-                anchors.fill: parent
+                height: root.cellHeight
+                width: root.cellWidth
 
-                onClicked: {
-                    active = !active
-                    addToMaze(index)
+                y: calculatedRow * root.cellWidth + (calculatedRow * (lineSize * -1))
+                x: calculatedColumn * root.cellHeight + (calculatedColumn * (lineSize * -1))
+
+                color: activeFocus ? "#223498db" : "transparent"
+
+                focus: true
+
+                Keys.onPressed: {
+                    switch(event.key) {
+                    case Qt.Key_Up:
+                    case Qt.Key_Down:
+                    case Qt.Key_Left:
+                    case Qt.Key_Right:
+                        handleKey(event.key)
+                        break;
+
+                    }
+
+                    if (event.key === Qt.Key_R) {
+                        resetMaze();
+                    }
+
+                    event.accepted = true;
+                }
+
+                // color: inFrontier.indexOf(index) != -1 ? "#2ecc71" : (inMaze.indexOf(index) != -1 ? "#ecf0f1" : (active ? "#ecf0f1" : "#bdc3c7"))
+
+                Connections {
+                    target: root
+                    onOpenPathOnIndex: {
+                        if (index == indexToOpen) {
+
+                            if (direction == "up")
+                                delegate.upwall = false
+                            else if (direction == "down")
+                                delegate.downwall = false
+                            else if (direction == "left")
+                                delegate.leftwall = false
+                            else if (direction == "right")
+                                delegate.rightwall = false
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.top: parent.top
+
+                    height: lineSize
+                    width: parent.width
+                    color: "#000000"
+
+                    visible: upwall
+                }
+
+                Rectangle {
+                    anchors.bottom: parent.bottom
+
+                    height: lineSize
+                    width: parent.width
+                    color: "#000000"
+
+                    visible: downwall
+                }
+
+                Rectangle {
+                    anchors.left: parent.left
+
+                    height: parent.height
+                    width: lineSize
+                    color: "#000000"
+
+                    visible: leftwall
+                }
+
+                Rectangle {
+                    anchors.right: parent.right
+
+                    height: parent.height
+                    width: lineSize
+                    color: "#000000"
+
+                    visible: rightwall
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+
+                    onClicked: {
+                        if (root.generated && !parent.activeFocus && (delegate.calculatedColumn === 0 || delegate.calculatedColumn === columns - 1 || delegate.calculatedRow === 0 || delegate.calculatedRow === rows - 1)) {
+                            parent.forceActiveFocus()
+                        } else {
+                            root.forceActiveFocus()
+                        }
+
+                        if (!root.generated) {
+                            root.generated = true
+
+                            active = !active
+                            addToMaze(index)
+                        }
+                    }
                 }
             }
         }
