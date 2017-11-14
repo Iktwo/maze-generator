@@ -11,14 +11,19 @@ Rectangle {
     property int rows: 10
     property int columns: 10
 
+    readonly property int count: rows * columns
+    readonly property int mazesToGenerate: 100
+
     property bool generated: false
 
     property int cellHeight: Math.round((height - (viewMargins * 2))/ rows)
     property int cellWidth: Math.round((width - (viewMargins * 2))/ columns)
 
-    property int viewMargins: 20
+    property int viewMargins: 15
 
     signal openPathOnIndex(int indexToOpen, string direction)
+
+    property double mazeId: 0
 
     function addToMaze(value) {
         if (inMaze.indexOf(value) == -1) {
@@ -101,18 +106,52 @@ Rectangle {
     }
 
     function resetMaze() {
+        if (mazeId % 10 == 0) {
+            rows = rows + 1
+            columns = columns + 1
+        }
+
         inMaze = []
         inFrontier = []
         generated = false
         root.forceActiveFocus()
         view.model = undefined
         view.model = columns * rows
+        mazeId = mazeId + 1
+
+        generateStartingMaze()
     }
 
-    width: 1000
-    height: 1000
+    function generateStartingMaze() {
+        if (!root.generated) {
+            root.generated = true
+
+            addToMaze(Math.floor(Math.random() * root.count))
+        }
+    }
+
+    width: 595
+    height: 595
 
     color: "#ffffff"
+
+    focus: true
+
+    Keys.onPressed: {
+        if (event.key === Qt.Key_R) {
+            resetMaze();
+        }
+    }
+
+    Text {
+        anchors {
+            horizontalCenter: parent.horizontalCenter
+            top: parent.top
+            topMargin: 5
+        }
+
+        text: mazeId
+    }
 
     FocusScope {
         anchors.centerIn: parent
@@ -121,6 +160,12 @@ Rectangle {
         width: childrenRect.width
 
         focus: true
+
+        Keys.onPressed: {
+            if (event.key === Qt.Key_R) {
+                resetMaze();
+            }
+        }
 
         Repeater {
             id: view
@@ -170,28 +215,21 @@ Rectangle {
                         if (calculatedRow === 0) {
                             upwall = !upwall
                         }
-
-                        console.log("move up", calculatedRow, calculatedColumn);
                         break;
                     case Qt.Key_Down:
                         if (calculatedRow === rows - 1) {
                             downwall = !downwall
                         }
-                        console.log("move down", calculatedRow, calculatedColumn);
                         break;
                     case Qt.Key_Left:
                         if (calculatedColumn === 0) {
                             leftwall = !leftwall
                         }
-
-                        console.log("move left", calculatedRow, calculatedColumn);
                         break;
                     case Qt.Key_Right:
                         if (calculatedColumn === columns - 1) {
                             rightwall = !rightwall
                         }
-
-                        console.log("move right", calculatedRow, calculatedColumn);
                         break;
 
                     }
@@ -310,9 +348,51 @@ Rectangle {
         running: inFrontier.length > 0
         repeat: true
         interval: 16
+
         onTriggered: {
             var cell = Math.floor(Math.random() * inFrontier.length)
             addToMaze(inFrontier[cell])
         }
+
+        onRunningChanged: {
+            if (!running) {
+
+                var topLeft = 0
+                var topRight = rows - 1
+                var bottomLeft = root.count - rows
+                var bottomRight = root.count - 1
+                var typeOfMaze = Math.floor(Math.random() * 4)
+                switch (typeOfMaze) {
+                case 0:
+                    openPathOnIndex(topRight, "right")
+                    openPathOnIndex(bottomLeft, "left")
+                    break
+                case 1:
+                    openPathOnIndex(topLeft, "left")
+                    openPathOnIndex(bottomLeft, "left")
+                    break
+                case 2:
+                    openPathOnIndex(topLeft, "left")
+                    openPathOnIndex(bottomRight, "right")
+                    break
+                case 3:
+                    openPathOnIndex(topRight, "right")
+                    openPathOnIndex(bottomRight, "right")
+                    break
+                }
+
+                root.grabToImage(function(result) {
+                    result.saveToFile("maze_" + mazeId + ".png");
+
+                    if (mazeId < mazesToGenerate) {
+                        resetMaze()
+                    }
+                })
+            }
+        }
+    }
+
+    Component.onCompleted: {
+        resetMaze()
     }
 }
